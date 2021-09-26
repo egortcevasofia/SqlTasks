@@ -48,6 +48,22 @@ select count(*) from person
 where person.address like 'P.O. Box%';
 
 -- 9. Выведите таблицу с данными о суммарном весе международных пересылок с разбивкой по месяцам.
+select avg(weight) as average_weight, EXTRACT(MONTH FROM departure_date) as month
+from parcel p
+where p.id in (select parcelFrom.id --id посылок, где страны from и to различны
+               from country counFrom
+                        join city cityFrom on counFrom.id = cityFrom.id_country
+                        join person personFrom on cityFrom.id = personFrom.id_city
+                        join parcel parcelFrom on personFrom.id = parcelFrom.id_person_from
+                   except
+               select countryTo.id
+               from country countryTo
+                        join city cityTo on countryTo.id = cityTo.id_country
+                        join person personTo on personTo.id = personTo.id_city
+                        join parcel parcelTo on personTo.id = parcelTo.id_person_from)
+group by EXTRACT(MONTH FROM departure_date)
+order by EXTRACT(MONTH FROM departure_date);
+
 
 -- 10. Выведите список людей, которые никогда не получали посылки
 select * from person
@@ -58,6 +74,13 @@ left join parcel p on person.id = p.id_person_to
 where id_person_to IS NULL;
 
 -- 11. Выведите список людей, проживающих во Франции, которые получали посылки, но сами никогда их не отправляли.
-
-
-
+select per.*
+from person per
+         join city cit on per.id_city = cit.id
+         join country c on cit.id_country = c.id
+where c.id = 4
+  and per.id in (select id_person_to --есть в персон_ту но нет в персон_фром
+                 from parcel
+                     except
+                 select id_person_from
+                 from parcel);
