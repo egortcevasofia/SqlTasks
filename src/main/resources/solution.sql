@@ -1,6 +1,7 @@
 -- 1. Выведите список всех стран и количество городов в них
-select country.name, count(*) as count_city from country
-join city  on country.id = city.id_country
+select country.name, count(city) as count_city
+from country
+left join city on country.id = city.id_country
 group by country.name;
 
 -- 2. Получите список женских имен, встречающихся чаще 3-х раз
@@ -10,18 +11,32 @@ group by person.name
 having count(person.name) > 3;
 
 -- 3. Выведите список разведенных мужчин и одиноких женщин, проживающих в городе Lonzee
-select person.name, person.surname from person
+select person.name, person.surname
+from person
 join city on person.id_city = city.id
-where status = 'Divorced' and city.name = 'Lonzee';
+where (status = 'Single' and sex = 'F'and city.name = 'Lonzee')
+   or (status = 'Divorced' and sex = 'M' and city.name = 'Lonzee');
 
--- 4. Выведите список стран, в которых количество разведенных мужчин превышает
---количество одиноких женщин
-select country.name, count(person.sex = 'M'), count(person.sex = 'F') from country
-join city on country.id = city.id_country
-join person on city.id = person.id_city
-where person.status = 'Divorced'
-group by country.name
--- having count(person.sex = 'M') > count(person.sex = 'F')
+-- 4. Выведите список стран, в которых количество разведенных мужчин превышает количество одиноких женщин
+with men as (
+    select country.name, count(person) cm
+    from country
+             join city on country.id = city.id_country
+             join person on city.id = person.id_city
+    where (person.status = 'Divorced' and person.sex = 'M')
+    group by country.name),
+
+     women as (
+         select country.name, count(person) cw
+         from country
+                  join city on country.id = city.id_country
+                  join person on city.id = person.id_city
+         where (person.status = 'Single' and person.sex = 'F')
+         group by country.name)
+
+select men.name, cm from men
+join women on women.name = men.name
+where cm > cw;
 
 
 -- 5. Выведите посылки, отправленные в мае 2020 года из Франции в Бельгию
@@ -36,7 +51,8 @@ where cfrom.name = 'France' and cto.name = 'Belgium'
 and parcel.departure_date between '2020-05-01 00:00:00' and '2020-05-31 23:59:59';
 
 -- 6. Выведите список посылок, находящихся в процессе доставки 1 января 2019 года
-
+select * , departure_date + make_interval(hours := delivery_time) as arrival_time from parcel
+where '2019-01-01' between  departure_date and departure_date + make_interval(hours := delivery_time);
 
 -- 7. Найдите человека, которому была отправлена самая тяжелая посылка
 select * from person
@@ -45,25 +61,19 @@ where p.weight = (select max(weight) from parcel);
 
 -- 8. Определите количество людей, у которых в адресе указан абонентский ящик (P.O. Box)
 select count(*) from person
-where person.address like 'P.O. Box%';
+where person.address like '%P.O. Box%';
 
 -- 9. Выведите таблицу с данными о суммарном весе международных пересылок с разбивкой по месяцам.
-select avg(weight) as average_weight, EXTRACT(MONTH FROM departure_date) as month
-from parcel p
-where p.id in (select parcelFrom.id --id посылок, где страны from и to различны
-               from country counFrom
-                        join city cityFrom on counFrom.id = cityFrom.id_country
-                        join person personFrom on cityFrom.id = personFrom.id_city
-                        join parcel parcelFrom on personFrom.id = parcelFrom.id_person_from
-                   except
-               select countryTo.id
-               from country countryTo
-                        join city cityTo on countryTo.id = cityTo.id_country
-                        join person personTo on personTo.id = personTo.id_city
-                        join parcel parcelTo on personTo.id = parcelTo.id_person_from)
-group by EXTRACT(MONTH FROM departure_date)
-order by EXTRACT(MONTH FROM departure_date);
-
+select sum(weight) as sum_weight, EXTRACT(MONTH FROM departure_date)
+from parcel
+         join person pfrom on parcel.id_person_from = pfrom.id
+         join person pto on parcel.id_person_to = pto.id
+         join city cityfrom on pfrom.id_city = cityfrom.id
+         join city cityto on pto.id_city = cityto.id
+         join country cfrom on cityfrom.id_country = cfrom.id
+         join country cto on cityto.id_country = cto.id
+where cfrom != cto
+GROUP BY  EXTRACT(year FROM departure_date), EXTRACT(MONTH FROM departure_date);
 
 -- 10. Выведите список людей, которые никогда не получали посылки
 select * from person
