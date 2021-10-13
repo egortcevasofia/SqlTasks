@@ -24,7 +24,7 @@ with men as (
              join city on country.id = city.id_country
              join person on city.id = person.id_city
     where (person.status = 'Divorced' and person.sex = 'M')
-    group by country.name),
+    group by country.id),
 
      women as (
          select country.name, count(person) cw
@@ -32,7 +32,7 @@ with men as (
                   join city on country.id = city.id_country
                   join person on city.id = person.id_city
          where (person.status = 'Single' and person.sex = 'F')
-         group by country.name)
+         group by country.id)
 
 select men.name, cm from men
 join women on women.name = men.name
@@ -64,7 +64,7 @@ select count(*) from person
 where person.address like '%P.O. Box%';
 
 -- 9. Выведите таблицу с данными о суммарном весе международных пересылок с разбивкой по месяцам.
-select sum(weight) as sum_weight, EXTRACT(MONTH FROM departure_date)
+select sum(weight) as sum_weight, EXTRACT(YEAR FROM departure_date), EXTRACT(MONTH FROM departure_date)
 from parcel
          join person pfrom on parcel.id_person_from = pfrom.id
          join person pto on parcel.id_person_to = pto.id
@@ -94,3 +94,34 @@ where c.id = 4
                      except
                  select id_person_from
                  from parcel);
+
+--12. Выведите 10 первых значений функции факториал (1, 2, 6, 24, 120 и т.д.)
+WITH RECURSIVE temp (n, fact) AS
+                   (SELECT 0, 1
+                    UNION ALL
+                    SELECT n+1, (n+1)*fact FROM temp
+                    WHERE n < 9)
+SELECT * FROM temp;
+
+-- 13. Две посылки объединяются в цепочку, если вторая посылка отправлена в тот же день,
+--     когда получена первая посылка и страна отправления второй посылки совпадает со страной
+--     прибытия первой посылки. Все посылки в цепочке должны быть международными.
+--     Напишите запрос, который находит самые длинные цепочки (по количеству объединенных посылок)
+--     и выводит их в виде последовательного объединения кодов посылок (например 1157 - 2195 - 2989)
+
+
+
+
+
+
+-- 14. Напишите запрос добавления столбца для хранения округленного веса в таблицу parcel и напишите
+--     запрос, сохраняющий в этот столбец округленных вес посылки. Вес посылок до 1 кг должен округляться до 100 грамм,
+--     1 - 10 кг до 250 грамм, свыше 10 кг до 500 грамм
+
+select * from parcel;
+ALTER TABLE parcel ADD COLUMN round_weight integer;
+
+UPDATE parcel SET round_weight = case
+                                     when (parcel.weight between 0 and 1000) then (round(weight / 100.0) * 100)
+                                     when (parcel.weight between 1001 and 10000) then (round(weight / 250.0) * 250)
+                                     else (round(parcel.weight / 500.0) * 500) end;
