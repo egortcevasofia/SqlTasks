@@ -109,8 +109,42 @@ SELECT * FROM temp;
 --     Напишите запрос, который находит самые длинные цепочки (по количеству объединенных посылок)
 --     и выводит их в виде последовательного объединения кодов посылок (например 1157 - 2195 - 2989)
 
+CREATE VIEW new_table AS  select parcel.id parcel_id,
+                                 date(departure_date + make_interval(hours := delivery_time)) delivery_date_parent,
+                                 date(parcel.departure_date) departure_date_cildren,
+                                 cto.id country_to_parent,
+                                 cfrom.id country_from_cildren
+                          from parcel
+                                   join person pfrom on parcel.id_person_from = pfrom.id
+                                   join person pto on parcel.id_person_to = pto.id
+                                   join city cityfrom on pfrom.id_city = cityfrom.id
+                                   join city cityto on pto.id_city = cityto.id
+                                   join country cfrom on cityfrom.id_country = cfrom.id
+                                   join country cto on cityto.id_country = cto.id
+                          where cto != cfrom
+                          order by delivery_date_parent asc;
 
+select * from new_table;
 
+WITH RECURSIVE temp(child_country_id, parent_country_id,
+                    child_date_id, parent_date_id,
+                    depth, path) AS (
+    SELECT nt.country_from_cildren, nt.country_to_parent,
+           nt.departure_date_cildren, nt.delivery_date_parent,
+           1::INT AS depth, nt.parcel_id::TEXT AS path
+    FROM new_table AS nt
+--     where delivery_date_parent != '2010-01-09'
+
+    UNION all
+
+    SELECT nt.country_from_cildren, nt.country_to_parent,
+           nt.departure_date_cildren, nt.delivery_date_parent,
+           t.depth + 1 AS depth, (t.path || '->' || nt.parcel_id::TEXT)
+    FROM temp AS t, new_table AS nt
+    WHERE nt.country_from_cildren = t.parent_country_id and nt.departure_date_cildren = t.parent_date_id
+)
+SELECT * FROM temp
+order by temp.depth desc;
 
 
 
